@@ -560,6 +560,12 @@ function updatePinLabelVisibility(checked) {
 function startDrag(event) {
     draggingId = event.currentTarget.dataset.id;
     didDragPin = false;
+
+    if (draggingId) {
+        els.selectedPlant.value = draggingId;
+        event.currentTarget.classList.add("selected");
+    }
+
     event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
 }
