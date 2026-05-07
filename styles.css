@@ -406,6 +406,105 @@ textarea { min-height: 76px; resize: vertical; }
   display: none;
 }
 
+.pin-card {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 12;
+
+  display: grid;
+  gap: 10px;
+
+  max-width: 420px;
+  padding: 14px;
+
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 18px 38px rgba(0,0,0,0.24);
+  backdrop-filter: blur(10px);
+}
+
+.pin-card-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.pin-card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-2);
+  font-size: 1.9rem;
+}
+
+.pin-card h3 {
+  margin: 0 0 2px;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.pin-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pin-card-stat {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: #f8faf6;
+}
+
+.pin-card-stat strong {
+  display: block;
+  font-size: 1.15rem;
+}
+
+.pin-card-close {
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: #f3f7f0;
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+
+.pin-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (min-width: 760px) {
+  .pin-card {
+    right: auto;
+    width: 420px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pin-card {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 12px;
+  }
+
+  .pin-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .empty-state {
     border: 1px dashed #c8d8c3;
     border-radius: 16px;

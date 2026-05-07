@@ -41,6 +41,8 @@ const defaultState = {
 
 let state = loadState();
 let draggingId = null;
+let didDragPin = false;
+let activePinCardId = null;
 let plantCareLibrary = [];
 
 const els = {
@@ -71,6 +73,7 @@ const els = {
     pinSizeValue: document.getElementById("pinSizeValue"),
     showPinLabels: document.getElementById("showPinLabels"),
     yardMap: document.getElementById("yardMap"),
+    pinCard: document.getElementById("pinCard"),
     photoUpload: document.getElementById("photoUpload"),
     clearPhoto: document.getElementById("clearPhoto"),
     mapNotice: document.getElementById("mapNotice"),
@@ -448,12 +451,88 @@ function renderMap() {
     if (plant.id === els.selectedPlant.value) pin.classList.add("selected");
     pin.addEventListener("pointerdown", startDrag);
     pin.addEventListener("click", (event) => {
-        event.stopPropagation();
-        els.selectedPlant.value = plant.id;
-        renderMap();
+    event.stopPropagation();
+
+    if (didDragPin) {
+        didDragPin = false;
+        return;
+    }
+
+    els.selectedPlant.value = plant.id;
+    showPinCard(plant.id);
+    renderMap();
     });
     els.yardMap.appendChild(pin);
     });
+
+    renderPinCard();
+}
+
+function showPinCard(id) {
+    activePinCardId = id;
+    renderPinCard();
+}
+
+function hidePinCard() {
+    activePinCardId = null;
+    if (els.pinCard) {
+        els.pinCard.classList.add("hidden");
+        els.pinCard.innerHTML = "";
+    }
+}
+
+function renderPinCard() {
+    if (!els.pinCard) return;
+
+    const plant = state.plants.find(p => p.id === activePinCardId);
+
+    if (!plant) {
+        hidePinCard();
+        return;
+    }
+
+    const status = waterStatus(plant);
+    const nextDate = nextWaterDate(plant);
+    const nextDateText = nextDate.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric"
+    });
+
+    els.pinCard.classList.remove("hidden");
+
+    els.pinCard.innerHTML = `
+        <div class="pin-card-header">
+            <div class="pin-card-icon" aria-hidden="true">${escapeHtml(plant.icon || "🌿")}</div>
+            <div>
+                <h3>${escapeHtml(plant.name || "Unnamed plant")}</h3>
+                <div class="small muted">${escapeHtml(plant.type || "Unknown type")} · ${escapeHtml(plant.location || "No location set")}</div>
+                <div class="plant-meta">
+                    <span class="pill ${status.className}">💧 ${status.label}</span>
+                    <span class="pill">☀️ ${escapeHtml(plant.light || "Unknown light")}</span>
+                </div>
+            </div>
+            <button class="pin-card-close" type="button" data-pin-card-action="close" aria-label="Close plant card">×</button>
+        </div>
+
+        <div class="pin-card-grid">
+            <div class="pin-card-stat">
+                <span class="small muted">Next watering</span>
+                <strong>${escapeHtml(status.label)}</strong>
+                <span class="small muted">${escapeHtml(nextDateText)}</span>
+            </div>
+            <div class="pin-card-stat">
+                <span class="small muted">Water amount</span>
+                <strong>${escapeHtml(plant.waterAmount || "Check soil")}</strong>
+            </div>
+        </div>
+
+        ${plant.notes ? `<p class="small muted">${escapeHtml(plant.notes)}</p>` : ""}
+
+        <div class="pin-card-actions">
+            <button class="primary" type="button" data-pin-card-action="water" data-id="${plant.id}">Watered today</button>
+            <button class="secondary" type="button" data-pin-card-action="edit" data-id="${plant.id}">Edit details</button>
+        </div>
+    `;
 }
 
 function updatePinSize(value) {
@@ -480,12 +559,15 @@ function updatePinLabelVisibility(checked) {
 
 function startDrag(event) {
     draggingId = event.currentTarget.dataset.id;
+    didDragPin = false;
     event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
 }
 
 function moveDrag(event) {
     if (!draggingId) return;
+    didDragPin = true;
+    hidePinCard();
     placePlantAtPointer(draggingId, event);
 }
 
@@ -750,10 +832,39 @@ els.dueList.addEventListener("click", (event) => {
 els.selectedPlant.addEventListener("change", renderMap);
 els.pinSize.addEventListener("input", event => updatePinSize(event.target.value));
 els.showPinLabels.addEventListener("change", event => updatePinLabelVisibility(event.target.checked));
+els.pinCard.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-pin-card-action]");
+    if (!button) return;
+
+    event.stopPropagation();
+
+    const action = button.dataset.pinCardAction;
+    const id = button.dataset.id || activePinCardId;
+
+    if (action === "close") {
+        hidePinCard();
+    }
+
+    if (action === "water") {
+        waterPlant(id);
+        activePinCardId = id;
+        renderPinCard();
+    }
+
+    if (action === "edit") {
+        hidePinCard();
+        editPlant(id);
+    }
+});
 els.yardMap.addEventListener("click", (event) => {
     if (event.target.closest(".pin")) return;
+    if (event.target.closest(".pin-card")) return;
+
+    hidePinCard();
+
     const id = els.selectedPlant.value;
     if (!id) return;
+
     placePlantAtPointer(id, event);
 });
 els.yardMap.addEventListener("pointermove", moveDrag);
