@@ -55,7 +55,8 @@
             <input id="plantId" type="hidden" />
             <div class="form-row">
               <label>Name
-                <input id="plantName" required placeholder="Braided hibiscus" />
+                <input id="plantName" required placeholder="Braided hibiscus" list="plantNameSuggestions" autocomplete="off" />
+                <datalist id="plantNameSuggestions"></datalist>
               </label>
               <label>Icon
                 <select id="plantIcon">

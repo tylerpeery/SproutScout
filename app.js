@@ -37,6 +37,7 @@ const defaultState = {
 
 let state = loadState();
 let draggingId = null;
+let plantCareLibrary = [];
 
 const els = {
     tabs: document.querySelectorAll(".tab-btn"),
@@ -51,6 +52,7 @@ const els = {
     formTitle: document.getElementById("formTitle"),
     plantId: document.getElementById("plantId"),
     plantName: document.getElementById("plantName"),
+    plantNameSuggestions: document.getElementById("plantNameSuggestions"),
     plantIcon: document.getElementById("plantIcon"),
     plantType: document.getElementById("plantType"),
     plantLocation: document.getElementById("plantLocation"),
@@ -129,6 +131,195 @@ function render() {
     renderPlantList();
     renderPlantSelect();
     renderMap();
+}
+
+async function loadPlantCareLibrary() {
+    try {
+        const response = await fetch("./plant-care.csv", { cache: "no-store" });
+        if (!response.ok) throw new Error(`Could not load plant-care.csv: ${response.status}`);
+
+        const csvText = await response.text();
+
+        plantCareLibrary = parseCsv(csvText)
+            .map(normalizePlantCareRow)
+            .filter(row => row.name);
+
+        renderPlantNameSuggestions();
+
+        console.info(`Loaded ${plantCareLibrary.length} plant care library entries.`);
+    } catch (err) {
+        console.info("No plant-care.csv library loaded yet. Add plant-care.csv next to index.html to enable autofill.", err);
+    }
+}
+
+function renderPlantNameSuggestions() {
+    if (!els.plantNameSuggestions) return;
+
+    els.plantNameSuggestions.innerHTML = "";
+
+    plantCareLibrary
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach(row => {
+            const option = document.createElement("option");
+            option.value = row.name;
+            option.label = row.type
+                ? `${row.className || "Plant"} · ${row.type}`
+                : (row.className || "Plant");
+
+            els.plantNameSuggestions.appendChild(option);
+        });
+}
+
+function normalizePlantCareRow(row) {
+    return {
+        name: row["Name"] || "",
+        className: row["Class"] || "",
+        type: row["Type/Variety"] || "",
+        light: row["Sun Need"] || "",
+        waterInterval: parseWaterEvery(row["Water Every"] || ""),
+        waterAmount: row["Water Amount"] || "",
+        notes: row["Care Notes"] || ""
+    };
+}
+
+function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === "\"" && inQuotes && next === "\"") {
+            cell += "\"";
+            i++;
+        } else if (char === "\"") {
+            inQuotes = !inQuotes;
+        } else if (char === "," && !inQuotes) {
+            row.push(cell.trim());
+            cell = "";
+        } else if ((char === "\n" || char === "\r") && !inQuotes) {
+            if (char === "\r" && next === "\n") i++;
+
+            row.push(cell.trim());
+
+            if (row.some(value => value !== "")) {
+                rows.push(row);
+            }
+
+            row = [];
+            cell = "";
+        } else {
+            cell += char;
+        }
+    }
+
+    row.push(cell.trim());
+
+    if (row.some(value => value !== "")) {
+        rows.push(row);
+    }
+
+    if (!rows.length) return [];
+
+    const headers = rows[0].map(header => header.replace(/^\uFEFF/, "").trim());
+
+    return rows.slice(1).map(values => {
+        const object = {};
+
+        headers.forEach((header, index) => {
+            object[header] = values[index] || "";
+        });
+
+        return object;
+    });
+}
+
+function parseWaterEvery(value) {
+    const text = String(value).trim().toLowerCase();
+
+    if (!text) return "";
+    if (text === "daily" || text === "every day") return 1;
+    if (text.includes("weekly")) return 7;
+    if (text.includes("biweekly") || text.includes("every other week")) return 14;
+    if (text.includes("monthly")) return 30;
+
+    const match = text.match(/[0-9]+([.][0-9]+)?/);
+    const number = match ? Number(match[0]) : NaN;
+
+    if (!Number.isFinite(number)) return "";
+
+    if (text.includes("week")) return Math.round(number * 7);
+    if (text.includes("month")) return Math.round(number * 30);
+
+    return Math.round(number);
+}
+
+function normalizeLookupName(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function autofillPlantFromLibrary() {
+    // Only autofill when creating a new plant.
+    // Do not overwrite existing saved plants while editing.
+    if (els.plantId.value) return;
+
+    const typedName = normalizeLookupName(els.plantName.value);
+    if (!typedName) return;
+
+    const match = plantCareLibrary.find(row => normalizeLookupName(row.name) === typedName);
+    if (!match) return;
+
+    if (match.type) els.plantType.value = match.type;
+    if (match.light) setSelectValue(els.plantLight, match.light);
+    if (match.waterInterval) setSelectValue(els.waterInterval, String(match.waterInterval));
+    if (match.waterAmount) els.waterAmount.value = match.waterAmount;
+    if (match.notes) els.plantNotes.value = match.notes;
+    if (match.className) els.plantIcon.value = iconForPlantClass(match.className);
+}
+
+function setSelectValue(select, value) {
+    const normalizedValue = String(value).trim().toLowerCase();
+
+    const existingOption = [...select.options].find(option => {
+        return option.value.toLowerCase() === normalizedValue ||
+            option.textContent.trim().toLowerCase() === normalizedValue;
+    });
+
+    if (existingOption) {
+        select.value = existingOption.value;
+        return;
+    }
+
+    // This allows CSV values like "5 days" to become a new dropdown option.
+    if (select === els.waterInterval) {
+        const parsedInterval = parseWaterEvery(value);
+
+        if (parsedInterval) {
+            const option = document.createElement("option");
+            option.value = String(parsedInterval);
+            option.textContent = `${parsedInterval} day${parsedInterval === 1 ? "" : "s"}`;
+            select.appendChild(option);
+            select.value = String(parsedInterval);
+        }
+    }
+}
+
+function iconForPlantClass(className) {
+    const text = String(className).toLowerCase();
+
+    if (text.includes("flower")) return "🌺";
+    if (text.includes("tree") || text.includes("shrub")) return "🌳";
+    if (text.includes("succulent") || text.includes("cactus")) return "🌵";
+    if (text.includes("vegetable")) return "🍅";
+    if (text.includes("berry") || text.includes("fruit")) return "🫐";
+    if (text.includes("potted") || text.includes("indoor")) return "🪴";
+    if (text.includes("new")) return "🌱";
+
+    return "🌿";
 }
 
 function renderDashboard() {
@@ -487,6 +678,8 @@ function showPhoneTips() {
 
 els.tabs.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 els.plantForm.addEventListener("submit", savePlantFromForm);
+els.plantName.addEventListener("input", autofillPlantFromLibrary);
+els.plantName.addEventListener("change", autofillPlantFromLibrary);
 els.resetForm.addEventListener("click", resetForm);
 els.plantList.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
@@ -527,4 +720,5 @@ els.installHintBtn.addEventListener("click", showPhoneTips);
 
 resetForm();
 render();
+loadPlantCareLibrary();
 setInterval(() => checkDueAndNotify(false), 60 * 60 * 1000);
