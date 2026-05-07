@@ -32,7 +32,11 @@ const defaultState = {
     }
     ],
     photoDataUrl: "",
-    lastNotificationDate: ""
+    lastNotificationDate: "",
+    mapSettings: {
+        pinSize: 46,
+        showPinLabels: true
+    }
 };
 
 let state = loadState();
@@ -63,6 +67,9 @@ const els = {
     plantNotes: document.getElementById("plantNotes"),
     resetForm: document.getElementById("resetForm"),
     selectedPlant: document.getElementById("selectedPlant"),
+    pinSize: document.getElementById("pinSize"),
+    pinSizeValue: document.getElementById("pinSizeValue"),
+    showPinLabels: document.getElementById("showPinLabels"),
     yardMap: document.getElementById("yardMap"),
     photoUpload: document.getElementById("photoUpload"),
     clearPhoto: document.getElementById("clearPhoto"),
@@ -114,7 +121,15 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return structuredClone(defaultState);
     const parsed = JSON.parse(raw);
-    return { ...structuredClone(defaultState), ...parsed, plants: parsed.plants || [] };
+    return {
+    ...structuredClone(defaultState),
+    ...parsed,
+    plants: parsed.plants || [],
+    mapSettings: {
+        ...defaultState.mapSettings,
+        ...(parsed.mapSettings || {})
+        }
+    };
     } catch (err) {
     console.warn("Could not load saved state", err);
     return structuredClone(defaultState);
@@ -397,6 +412,16 @@ function renderPlantSelect() {
 
 function renderMap() {
     const photo = state.photoDataUrl;
+    const pinSize = Number(state.mapSettings?.pinSize || 46);
+    const showPinLabels = state.mapSettings?.showPinLabels !== false;
+
+    els.yardMap.style.setProperty("--pin-size", `${pinSize}px`);
+    els.yardMap.classList.toggle("hide-pin-labels", !showPinLabels);
+
+    if (els.pinSize) els.pinSize.value = String(pinSize);
+    if (els.pinSizeValue) els.pinSizeValue.textContent = `${pinSize}px`;
+    if (els.showPinLabels) els.showPinLabels.checked = showPinLabels;
+    
     els.yardMap.querySelectorAll(".pin").forEach(pin => pin.remove());
     els.yardMap.classList.toggle("has-photo", Boolean(photo));
     if (photo) {
@@ -429,6 +454,28 @@ function renderMap() {
     });
     els.yardMap.appendChild(pin);
     });
+}
+
+function updatePinSize(value) {
+    const pinSize = Number(value);
+
+    state.mapSettings = {
+        ...state.mapSettings,
+        pinSize
+    };
+
+    saveState();
+    renderMap();
+}
+
+function updatePinLabelVisibility(checked) {
+    state.mapSettings = {
+        ...state.mapSettings,
+        showPinLabels: checked
+    };
+
+    saveState();
+    renderMap();
 }
 
 function startDrag(event) {
@@ -701,6 +748,8 @@ els.dueList.addEventListener("click", (event) => {
     if (button.dataset.action === "edit") editPlant(button.dataset.id);
 });
 els.selectedPlant.addEventListener("change", renderMap);
+els.pinSize.addEventListener("input", event => updatePinSize(event.target.value));
+els.showPinLabels.addEventListener("change", event => updatePinLabelVisibility(event.target.checked));
 els.yardMap.addEventListener("click", (event) => {
     if (event.target.closest(".pin")) return;
     const id = els.selectedPlant.value;

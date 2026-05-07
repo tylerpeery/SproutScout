@@ -140,6 +140,18 @@
           <input id="photoUpload" class="hidden" type="file" accept="image/*" />
           <button id="clearPhoto" class="secondary" type="button">Clear photo</button>
         </div>
+
+        <div class="map-controls">
+          <label>
+            Pin size
+            <input id="pinSize" type="range" min="28" max="84" step="2" value="46" />
+          </label>
+          <span id="pinSizeValue" class="small muted">46px</span>
+          <label class="inline-check">
+            <input id="showPinLabels" type="checkbox" checked />
+            Show labels
+          </label>
+        </div>
         <div id="mapNotice" class="notice">Choose a plant, then tap the map/photo to place it. Drag an existing pin to adjust it.</div>
         <div id="yardMap" class="yard-map" aria-label="Plant map">
           <div class="map-help small muted">No photo yet: use this as a rough yard layout, or upload a picture of the outside area.</div>
